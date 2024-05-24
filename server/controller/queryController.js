@@ -20,51 +20,86 @@ const creatingQueryResponse = async(req, res) => {
 }
 
 const gettingQueryResponses = async (req, res) => {
-    try {
-      const userInput = req.body.query;
-  
-      if (!userInput) {
-        return res.status(400).json({
-          error: "Please provide a query"
-        });
-      }
-  
-      // Check if the userInput contains keywords related to date
-      const dateKeywords = ["today", "date", "current date", "today's date"];
-      const containsDateKeyword = dateKeywords.some(keyword => 
-        new RegExp(keyword, 'i').test(userInput)
-      );
-  
-      if (containsDateKeyword) {
-        const today = new Date();
-        return res.status(200).json({
-          response: today.toDateString()
-        });
-      }
-  
-      // Find the document where any of the strings in the 'query' array match the user input (case-insensitive)
-      const queryResponse = await QueryResponse.findOne({
-        query: { $regex: new RegExp(userInput, 'i') }
-      });
-  
-      if (queryResponse) {
-        res.status(200).json({
-          response: queryResponse.response
-        });
-      } else {
-        res.status(200).json({
-          response: "For my knowledge, I can't understand what you ask."
-        });
-      }
-    } catch (err) {
-      res.status(500).json({
-        error: err.message
+  try {
+    const { query: userInput, dbquery: dbInput } = req.body;
+
+    if (!userInput && !dbInput) {
+      return res.status(400).json({ error: "Please provide a query" });
+    }
+
+    // Check if the userInput contains keywords related to date
+    const dateKeywords = ["today", "date", "current date", "today's date"];
+    const containsDateKeyword = userInput && dateKeywords.some(keyword => 
+      new RegExp(keyword, 'i').test(userInput)
+    );
+
+    if (containsDateKeyword) {
+      const today = new Date();
+      return res.status(200).json({ response: today.toDateString() });
+    }
+
+    let queryResponse = null;
+
+    if (userInput) {
+      const regex = new RegExp(userInput, 'i'); // 'i' makes the search case-insensitive
+      queryResponse = await QueryResponse.findOne({ query: { $elemMatch: { $regex: regex } } });
+    }
+
+    if (!queryResponse && dbInput) {
+      queryResponse = await QueryResponse.findOne({ query: { $in: dbInput } });
+    }
+
+    if (queryResponse) {
+      return res.status(200).json({ response: queryResponse.response });
+    } else {
+      return res.status(200).json({
+        response: "I'm sorry, but I don't understand what you're asking. Could you please contact the Sri Lankan Travel Agency for more information? Hotline : 021-568-9548, Email : lta@agent.com, Website : sltravelagency.lk."
       });
     }
-  };
+
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+const gettingSuggestionQueryResponse = async (req, res) => {
+  try {
+    const { queryString } = req.body;
+
+    if (!queryString) {
+      res.status(200).json([]);
+      return;
+    }
+
+    const regex = new RegExp(queryString, 'i'); // 'i' makes the search case-insensitive
+
+    const results = await QueryResponse.aggregate([
+      { $match: { query: { $elemMatch: { $regex: regex } } } },
+      { $unwind: "$query" },
+      { $match: { query: { $regex: regex } } },
+      { $group: {
+          _id: null,
+          allQueries: { $push: "$query" }
+        }
+      },
+      { $project: {
+          _id: 0,
+          allQueries: 1
+        }
+      }
+    ]);
+
+    res.status(200).json(results.length > 0 ? results[0].allQueries : []);
+  } catch (err) {
+    res.status(500).json({
+      error: err.message
+    });
+  }
+}
   
 
 module.exports = {
     creatingQueryResponse,
-    gettingQueryResponses
+    gettingQueryResponses,
+    gettingSuggestionQueryResponse
 }

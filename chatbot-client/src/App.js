@@ -11,25 +11,54 @@ function App() {
   ]);
   const [userMessage, setUserMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [queries, setQueries] = useState([]);
+  // const [selectedQuery, setSelectedQuery] = useState("");
   // const [loadingMessage, setLoadingMessage] = useState(false);
 
-  const fetchResponseForQuery = async() => {
-    const message = {
-      query: userMessage
+  const fetchResponseForQuery = async(query) => {
+    let message;
+    if(query){
+      message = {
+        dbquery: query
+      }
+    }else{
+      message = {
+        query: userMessage
+      }
     }
     // setLoadingMessage(true);
-    setQueryResponse([...queryResponse, {query:userMessage, response:"......"}]);
+    setQueryResponse([...queryResponse, {query:(query? query : userMessage), response:"......"}]);
     try{
       const response = await axios.post(`${process.env.REACT_APP_BASEURL}/api/query/find-matching-response`, message);
       console.log(response.data);
-      setQueryResponse([...queryResponse, {query:userMessage, response:response.data.response}]);
+      setQueryResponse([...queryResponse, {query:(query? query : userMessage), response:response.data.response}]);
     }catch(err){
       console.log(err);
       setErrorMessage(err.response.data.error);
-      setQueryResponse([...queryResponse, {query:userMessage, response:"Error, Something went wrong...."}]);
+      setQueryResponse([...queryResponse, {query:(query? query : userMessage), response:"Error, Something went wrong...."}]);
     }finally{
       setUserMessage("");
+      // setSelectedQuery("");
+      setQueries([]);
       // setLoadingMessage(false);
+    }
+  }
+
+  const handleChange = async(e) => {
+
+    setUserMessage(e.target.value);
+    setErrorMessage("");
+
+    const queryString = {queryString:e.target.value}
+    if(e.target.value && e.target.value !== " "){
+      try{
+        const response = await axios.post(`${process.env.REACT_APP_BASEURL}/api/query/find-out-matching-queries`, queryString);
+        console.log(response.data);
+        setQueries(response.data);
+      }catch(err){
+        console.log(err);
+        setQueries([]);
+      }
     }
   }
 
@@ -83,21 +112,37 @@ function App() {
                   id="input"
                   placeholder="Enter your message"
                   value={userMessage}
-                  onChange={(e) => {
-                    setUserMessage(e.target.value);
-                    setErrorMessage("");
-                  }}
+                  onChange={handleChange}
                   onKeyPress={(e) => {
                     if (e.key === "Enter") {
                       fetchResponseForQuery();
                     }
                   }}
                 />
+
+                {queries.length > 0 && userMessage && (
+                  <div className="seach-dropdown-area">
+                    {queries.map((query, index) => {
+                      return (
+                        <div
+                          className="seach-dropdown-data"
+                          key={index}
+                          onClick={() => {
+                            // setSelectedQuery(query);
+                            setQueries([]);
+                            fetchResponseForQuery(query)
+                          }}
+                        >
+                          {query}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
               <div className="btn">
                 <button
-                  onClick={fetchResponseForQuery}
-                  // disabled={!userMessage}
+                  onClick={fetchResponseForQuery} // disabled={!userMessage}
                 >
                   <i className="fas fa-paper-plane me-2"></i>Send
                 </button>
