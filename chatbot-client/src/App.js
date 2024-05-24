@@ -142,7 +142,7 @@ function App() {
               </div>
               <div className="btn">
                 <button
-                  onClick={fetchResponseForQuery} // disabled={!userMessage}
+                  onClick={()=>fetchResponseForQuery()} // disabled={!userMessage}
                 >
                   <i className="fas fa-paper-plane me-2"></i>Send
                 </button>
